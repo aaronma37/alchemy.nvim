@@ -74,7 +74,7 @@ local function parse_changes(identifier)
     command_status[current_job]["short_diagnostics"] = identifier
   end
 
-  if string.find(identifier, current_job .. "=> success") and not string.find(identifier, "echo") and not string.find(identifier, "; fi;") then
+  if (string.find(identifier, current_job .. "=> success") or string.find(identifier, "PASSED") ) and not string.find(identifier, "echo") and not string.find(identifier, "; fi;") then
     command_status[current_job]["status"] = "success"
     command_status[current_job]["short_diagnostics"] = nil
     current_job = nil
@@ -165,7 +165,6 @@ local function test()
           local val = vim.api.nvim_buf_get_lines(term_buf, i, i + 1, false)
           local identifier = string.sub(table.concat(val), 0, 1000)
           parse_changes(identifier)
-          print(current_job)
           if queued_job == nil and current_job == nil then
             current_status_line = nil
             if next(cmd_list) ~= nil then
@@ -183,7 +182,6 @@ local function test()
       print_to_buffer(vis_buf2, command_status)
       if queued_job ~= nil then
         send_job(queued_job)
-        print("sending", queued_job[1])
         queued_job = nil
       end
       if complete == true then
