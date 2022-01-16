@@ -3,6 +3,8 @@ local gui_purple = "#5f00d7"
 local cterm_purple = "57"
 local gui_green = "#5fd787"
 local cterm_green = "78"
+local gui_red = "red"
+local cterm_red = "red"
 local term_buf = nil
 local vis_buf2 = nil
 local queued_job = nil
@@ -11,6 +13,7 @@ local complete = false
 local detected_error = nil
 local current_status_line = nil
 local current_stage_idx = nil
+local anim_state = 1
 
 local start_cmds = {}
 local requested_commands = {
@@ -35,14 +38,116 @@ local function print_to_buffer(buffer)
   vim.api.nvim_buf_set_lines(buffer, 0, vim.api.nvim_buf_line_count(buffer), false, {})
   local prnt = {}
   local job_str_t = {}
+  local success = true
+  local p1 = {}
+  table.insert(p1, "       ")
+  table.insert(p1, "    ▏  ▕")
+  table.insert(p1, "    ▏﹏▕")
+  table.insert(p1, "   /.  .\\")
+  table.insert(p1, "  / .·˙  \\")
+  table.insert(p1, "  \\  .   /")
+  table.insert(p1, "   ▔▔▔▔▔▔")
+  local img = {}
 
-    table.insert(prnt, "      O")
-    table.insert(prnt, "    |o |")
-    table.insert(prnt, "    |~~|")
-    table.insert(prnt, "   /.  .\\")
-    table.insert(prnt, "  / . .  \\")
-    table.insert(prnt, "  \\______/")
-    table.insert(prnt, "")
+  local p2 = {}
+  table.insert(p2, "        ")
+  table.insert(p2, "    ▏  ▕")
+  table.insert(p2, "    ▏~~▕")
+  table.insert(p2, "   /  . \\")
+  table.insert(p2, "  / .    \\")
+  table.insert(p2, "  \\  .   /")
+  table.insert(p2, "   ▔▔▔▔▔▔")
+
+  local p3 = {}
+  table.insert(p3, "      ")
+  table.insert(p3, "    ▏  ▕")
+  table.insert(p3, "    ▏~~▕")
+  table.insert(p3, "   /  · \\")
+  table.insert(p3, "  / ·    \\")
+  table.insert(p3, "  \\  · . /")
+  table.insert(p3, "   ▔▔▔▔▔▔")
+
+  local p4 = {}
+  table.insert(p4, "       ")
+  table.insert(p4, "    ▏  ▕")
+  table.insert(p4, "    ▏~~▕")
+  table.insert(p4, "   /  ˙ \\")
+  table.insert(p4, "  / ˙    \\")
+  table.insert(p4, "  \\  ˙ · /")
+  table.insert(p4, "   ▔▔▔▔▔▔")
+
+  local p5 = {}
+  table.insert(p5, "       ")
+  table.insert(p5, "    ▏  ▕")
+  table.insert(p5, "    ▏~~▕")
+  table.insert(p5, "   /.   \\")
+  table.insert(p5, "  /  .   \\")
+  table.insert(p5, "  \\   .˙ /")
+  table.insert(p5, "   ▔▔▔▔▔▔")
+
+  local p6 = {}
+  table.insert(p6, "       ")
+  table.insert(p6, "    ▏  ▕")
+  table.insert(p6, "    ▏~~▕")
+  table.insert(p6, "   /·   \\")
+  table.insert(p6, "  /  · . \\")
+  table.insert(p6, "  \\   ·  /")
+  table.insert(p6, "   ▔▔▔▔▔▔")
+
+  local p7 = {}
+  table.insert(p7, "       ")
+  table.insert(p7, "    ▏  ▕")
+  table.insert(p7, "    ▏~~▕")
+  table.insert(p7, "   /˙   \\")
+  table.insert(p7, "  /  ˙ · \\")
+  table.insert(p7, "  \\   ˙  /")
+  table.insert(p7, "   ▔▔▔▔▔▔")
+
+  local p8 = {}
+  table.insert(p8, "       ")
+  table.insert(p8, "    ▏  ▕")
+  table.insert(p8, "    ▏~~▕")
+  table.insert(p8, "   / .  \\")
+  table.insert(p8, "  /   .˙ \\")
+  table.insert(p8, "  \\ .    /")
+  table.insert(p8, "   ▔▔▔▔▔▔")
+
+  local p9 = {}
+  table.insert(p9, "        ")
+  table.insert(p9, "    ▏  ▕")
+  table.insert(p9, "    ▏~~▕")
+  table.insert(p9, "   / ·  \\")
+  table.insert(p9, "  /   ·  \\")
+  table.insert(p9, "  \\ ·    /")
+  table.insert(p9, "   ▔▔▔▔▔▔")
+
+  local p10 = {}
+  table.insert(p10, "       ")
+  table.insert(p10, "    ▏  ▕")
+  table.insert(p10, "    ▏~~▕")
+  table.insert(p10, "   / ˙  \\")
+  table.insert(p10, "  /   ˙  \\")
+  table.insert(p10, "  \\ ˙    /")
+  table.insert(p10, "   ▔▔▔▔▔▔")
+
+  table.insert(img, p2)
+  table.insert(img, p3)
+  table.insert(img, p4)
+  table.insert(img, p5)
+  table.insert(img, p6)
+  table.insert(img, p7)
+  table.insert(img, p8)
+  table.insert(img, p9)
+  table.insert(img, p10)
+
+  for _, v in ipairs(img[anim_state]) do
+    table.insert(prnt, v)
+  end
+  anim_state = anim_state + 1
+  if anim_state > #img then
+    anim_state = 1
+  end
+
 
 
   -- Current job
@@ -76,6 +181,9 @@ local function print_to_buffer(buffer)
     table.insert(job_str_t, " --- " .. stage['name'] .." --- ")
     for idx, cmd in ipairs(requested_commands['stages'][current_stage_idx]['cmds']) do
       local job_name = cmd[1]
+      if command_status['stages'][stage_idx][job_name]["status"] == "fail" then
+        success = false
+      end
       if current_stage_idx >= stage_idx and job_name == current_job then
         table.insert(job_str_t, "-->" .. job_name .. ": " .. command_status['stages'][stage_idx][job_name]["status"])
       else
@@ -90,10 +198,12 @@ local function print_to_buffer(buffer)
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, prnt)
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, job_str_t)
 
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 4, 3, 9)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 3, 4, 8)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 2, 5, 7)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 1, 5, 7)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 6, 0, 25)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 5, 0, 12)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 4, 0, 12)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 3, 0, 12)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 2, 7, 9)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 1, 7, 9)
   vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 0, 5, 7)
 
   local gui_col = gui_purple
@@ -101,6 +211,10 @@ local function print_to_buffer(buffer)
   if complete then
     gui_col = gui_green
     cterm_col = cterm_green
+  end
+  if success == false then
+    gui_col = gui_red
+    cterm_col = cterm_red
   end
   vim.api.nvim_command('highlight Identifier guifg='.. gui_col ..' ctermfg=' .. cterm_col)
 end
@@ -220,6 +334,7 @@ local function test()
       -- vim.api.nvim_command('set modifiable')
       vim.api.nvim_command('set nonumber')
       vis_buf2 = vim.api.nvim_win_get_buf(0)
+      vim.api.nvim_command('<ESC> <C-W> <C-W>')
     end
 
     cmd_list = {}
