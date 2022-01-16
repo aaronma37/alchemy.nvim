@@ -1,4 +1,8 @@
 local ts_utils = require("nvim-treesitter.ts_utils")
+local gui_purple = "#5f00d7"
+local cterm_purple = "57"
+local gui_green = "#5fd787"
+local cterm_green = "78"
 local term_buf = nil
 local vis_buf2 = nil
 local queued_job = nil
@@ -32,12 +36,14 @@ local function print_to_buffer(buffer)
   local prnt = {}
   local job_str_t = {}
 
-    table.insert(prnt, "      0")
+    table.insert(prnt, "      O")
     table.insert(prnt, "    |o |")
     table.insert(prnt, "    |~~|")
-    table.insert(prnt, "   /    \\")
-    table.insert(prnt, "   \\____/")
+    table.insert(prnt, "   /.  .\\")
+    table.insert(prnt, "  / . .  \\")
+    table.insert(prnt, "  \\______/")
     table.insert(prnt, "")
+
 
   -- Current job
   if current_stage_idx then
@@ -83,6 +89,20 @@ local function print_to_buffer(buffer)
 
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, prnt)
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, job_str_t)
+
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 4, 3, 9)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 3, 4, 8)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 2, 5, 7)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 1, 5, 7)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 0, 5, 7)
+
+  local gui_col = gui_purple
+  local cterm_col = cterm_purple
+  if complete then
+    gui_col = gui_green
+    cterm_col = cterm_green
+  end
+  vim.api.nvim_command('highlight Identifier guifg='.. gui_col ..' ctermfg=' .. cterm_col)
 end
 
 local function parse_current_status_line(last_line_str)
