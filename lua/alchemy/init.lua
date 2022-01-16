@@ -6,10 +6,16 @@ local current_job = nil
 local complete = false
 local detected_error = nil
 local current_status_line = nil
+local current_stage_idx = nil
 
-local requested_commands = {}
+local start_cmds = {}
+local requested_commands = {
+  stages = {},
+}
 local cmd_list = {}
-local command_status = {}
+local command_status = {
+  stages = {}
+}
 
 -- =====================
 -- Global variables
@@ -26,11 +32,25 @@ local function print_to_buffer(buffer)
   local prnt = {}
   local job_str_t = {}
 
+    table.insert(prnt, "      0")
+    table.insert(prnt, "    |o |")
+    table.insert(prnt, "    |~~|")
+    table.insert(prnt, "   /    \\")
+    table.insert(prnt, "   \\____/")
+    table.insert(prnt, "")
+
+  -- Current job
+  if current_stage_idx then
+    table.insert(prnt, " [" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - " .. requested_commands['stages'][current_stage_idx]["name"])
+  else
+    table.insert(prnt, " [" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - ")
+  end
+
   -- Current job
   if current_job then
-    table.insert(prnt, " [" .. #requested_commands - #cmd_list .. "/" .. #requested_commands .."] Current job - " .. current_job)
+    table.insert(prnt, " [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job - " .. current_job)
   else
-    table.insert(prnt, " [" .. #requested_commands - #cmd_list .. "/" .. #requested_commands .."] Current job - ")
+    table.insert(prnt, " [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job -")
   end
 
   -- Current status line
@@ -45,18 +65,22 @@ local function print_to_buffer(buffer)
   end
 
   -- Job list
-  table.insert(job_str_t, " --- Jobs --- ")
-  for idx, cmd in ipairs(requested_commands) do
-    local job_name = cmd[1]
-    if job_name == current_job then
-      table.insert(job_str_t, "-->" .. job_name .. " => " .. command_status[job_name]["status"])
-    else
-      table.insert(job_str_t, "   " .. job_name .. " => " .. command_status[job_name]["status"])
-    end
-    if command_status[job_name]["short_diagnostics"] ~= nil then
-      table.insert(job_str_t, "\t\t\t\t\t" ..  command_status[job_name]["short_diagnostics"])
+  for stage_idx, stage in ipairs(requested_commands['stages']) do
+    table.insert(job_str_t, "")
+    table.insert(job_str_t, " --- " .. stage['name'] .." --- ")
+    for idx, cmd in ipairs(requested_commands['stages'][current_stage_idx]['cmds']) do
+      local job_name = cmd[1]
+      if current_stage_idx >= stage_idx and job_name == current_job then
+        table.insert(job_str_t, "-->" .. job_name .. ": " .. command_status['stages'][stage_idx][job_name]["status"])
+      else
+        table.insert(job_str_t, "   " .. job_name .. ": " .. command_status['stages'][stage_idx][job_name]["status"])
+      end
+      if command_status['stages'][stage_idx][job_name]["short_diagnostics"] ~= nil then
+        table.insert(job_str_t, "\t\t\t\t\t" ..  command_status['stages'][stage_idx][job_name]["short_diagnostics"])
+      end
     end
   end
+
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, prnt)
   vim.api.nvim_buf_set_lines(buffer, -2, -1, true, job_str_t)
 end
@@ -66,24 +90,24 @@ local function parse_current_status_line(last_line_str)
 end
 
 local function parse_changes(identifier)
-  if command_status[current_job] == nil then
+  if command_status['stages'][current_stage_idx][current_job] == nil then
     return false
   end
 
-  if command_status[current_job]["short_diagnostics"] == nil and string.find(identifier, "error: ") then
-    command_status[current_job]["short_diagnostics"] = identifier
+  if command_status['stages'][current_stage_idx][current_job]["short_diagnostics"] == nil and string.find(identifier, "error: ") then
+    command_status['stages'][current_stage_idx][current_job]["short_diagnostics"] = identifier
   end
 
   if (string.find(identifier, current_job .. "=> success") or string.find(identifier, "PASSED") ) and not string.find(identifier, "echo") and not string.find(identifier, "; fi;") then
-    command_status[current_job]["status"] = "success"
-    command_status[current_job]["short_diagnostics"] = nil
+    command_status['stages'][current_stage_idx][current_job]["status"] = "success"
+    command_status['stages'][current_stage_idx][current_job]["short_diagnostics"] = nil
     current_job = nil
     return true
   elseif string.find(identifier, current_job .. "=> fail") and not string.find(identifier, "echo") and not string.find(identifier, "; fi;") then
-    command_status[current_job]["status"] = "fail"
-    for idx, cmd in ipairs(requested_commands) do
+    command_status['stages'][current_stage_idx][current_job]["status"] = "fail"
+    for idx, cmd in ipairs(requested_commands['stages'][current_stage_idx]['cmds']) do
       if cmd[1] == current_job then
-        table.insert(requested_commands, 1, table.remove(requested_commands, idx))
+        table.insert(requested_commands['stages'][current_stage_idx]['cmds'], 1, table.remove(requested_commands['stages'][current_stage_idx]['cmds'], idx))
         break
       end
     end
@@ -93,15 +117,53 @@ local function parse_changes(identifier)
   return false
 end
 
+local function start_stage()
+  if #requested_commands['stages'] == 0 then
+    return 
+  end
+  if current_stage_idx == nil then
+    current_stage_idx = 1
+  elseif current_stage_idx <= #requested_commands['stages'] then
+    current_stage_idx = current_stage_idx + 1
+  else
+    return
+  end
+
+  command_status['stages'][current_stage_idx] = {}
+  for _,v in ipairs(requested_commands['stages'][current_stage_idx]['cmds']) do
+    command_status['stages'][current_stage_idx][v[1]] = {}
+    command_status['stages'][current_stage_idx][v[1]]["status"] = "..."
+    command_status['stages'][current_stage_idx][v[1]]["short_diagnostics"] = nil
+    table.insert(cmd_list, v)
+  end
+  queued_job = table.remove(cmd_list, 1)
+end
+
+local function initialize_status()
+  command_status['stages'] = {}
+  for stage_idx,v in ipairs(requested_commands['stages']) do
+    command_status['stages'][stage_idx] = {}
+    for cmd_idx, cmd in ipairs(v['cmds']) do
+    command_status['stages'][stage_idx][cmd[1]] = {}
+    command_status['stages'][stage_idx][cmd[1]]["status"] = "..."
+    command_status['stages'][stage_idx][cmd[1]]["short_diagnostics"] = nil
+    end
+  end
+end
+
 local function is_complete()
-  for k,v in pairs(command_status) do
+  for k,v in pairs(command_status['stages'][current_stage_idx]) do
     if v["status"] == "..." then
       return false
     end
   end
-
-  complete = true
-  return true
+  if current_stage_idx >= #requested_commands['stages'] then
+    complete = true
+    return true
+  end
+  print("COMPLETEA")
+  start_stage()
+  return false
 end
 
 local function send_job(cmd)
@@ -113,11 +175,12 @@ end
 
 local function test()
     if term_buf == nil then
-      vim.api.nvim_command('FloatermNew --name=alchemy_term --cwd=/home/aaron/code/EdgeAI')
+      vim.api.nvim_command('FloatermNew --name=alchemy_term')
       term_buf = vim.api.nvim_win_get_buf(0)
       vim.api.nvim_command('FloatermHide --name=alchemy_term')
-      vim.api.nvim_command('FloatermSend --name=alchemy_term shieldup')
-      vim.api.nvim_command('FloatermSend --name=alchemy_term source ~/data/shield_setup_rc')
+      for _, start_cmd in ipairs(start_cmds) do
+        local cmd_msg = "FloatermSend --name=alchemy_term " .. start_cmd
+      end
     end
     vim.api.nvim_command('FloatermSend --name=alchemy_term clear')
 
@@ -140,19 +203,13 @@ local function test()
     end
 
     cmd_list = {}
-    command_status = {}
-    for _,v in ipairs(requested_commands) do
-      command_status[v[1]] = {}
-      command_status[v[1]]["status"] = "..."
-      command_status[v[1]]["short_diagnostics"] = nil
-      table.insert(cmd_list, v)
-    end
+    current_stage_idx = nil
+    initialize_status()
+    start_stage()
 
     complete = false
     print_to_buffer(vis_buf2, command_status)
 
-
-    queued_job = table.remove(cmd_list, 1)
 
     vim.api.nvim_buf_attach(term_buf, false, {
       on_lines=function(...)
@@ -197,9 +254,18 @@ function M.attach(bufnr, lang) end
 function M.detach(bufnr) end
 
 local function setup(user_config)
-  for _,v in ipairs(user_config.cmds) do
-    requested_commands[v[1]] = v[2]
-    table.insert(requested_commands, v)
+  for _,v in ipairs(user_config.stages) do
+    local stage_cmds = {}
+    for _,v in ipairs(v.cmds) do
+      table.insert(stage_cmds, v)
+    end
+    local new_stage = {}
+    new_stage["cmds"] = stage_cmds
+    new_stage["name"] = v.name
+    table.insert(requested_commands["stages"], new_stage)
+  end
+  for _,v in ipairs(user_config.start_cmds) do
+    table.insert(start_cmds, v)
   end
 end
 
