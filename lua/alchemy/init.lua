@@ -314,6 +314,7 @@ local function test()
       vim.api.nvim_command('FloatermHide --name=alchemy_term')
       for _, start_cmd in ipairs(start_cmds) do
         local cmd_msg = "FloatermSend --name=alchemy_term " .. start_cmd
+        vim.api.nvim_command(cmd_msg)
       end
     end
     vim.api.nvim_command('FloatermSend --name=alchemy_term clear')
@@ -334,7 +335,6 @@ local function test()
       -- vim.api.nvim_command('set modifiable')
       vim.api.nvim_command('set nonumber')
       vis_buf2 = vim.api.nvim_win_get_buf(0)
-      vim.api.nvim_command('<ESC> <C-W> <C-W>')
     end
 
     cmd_list = {}
