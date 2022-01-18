@@ -5,6 +5,7 @@ fun! Alchemy()
 endfun
 
 command! -nargs=* Alchemy exe 'lua package.loaded.test = nil' | lua require'alchemy'.test(<args>)
+command! -nargs=* AlchemyCancel exe 'lua package.loaded.test = nil' | lua require'alchemy'.send_sigint(<args>)
 augroup Alchemy
   autocmd!
 augroup END

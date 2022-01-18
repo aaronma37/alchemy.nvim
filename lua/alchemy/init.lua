@@ -5,6 +5,8 @@ local gui_green = "#5fd787"
 local cterm_green = "78"
 local gui_red = "red"
 local cterm_red = "red"
+local gui_gray = "#8787af"
+local cterm_gray = "103"
 local term_buf = nil
 local vis_buf2 = nil
 local queued_job = nil
@@ -14,6 +16,7 @@ local detected_error = nil
 local current_status_line = nil
 local current_stage_idx = nil
 local anim_state = 1
+local stopped = false
 
 local start_cmds = {}
 local requested_commands = {
@@ -150,18 +153,19 @@ local function print_to_buffer(buffer)
 
 
 
+  local stage_str = nil
   -- Current job
   if current_stage_idx then
-    table.insert(prnt, " [" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - " .. requested_commands['stages'][current_stage_idx]["name"])
+    prnt[2] = prnt[2] .. "\t\t\t\t\t[" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - " .. requested_commands['stages'][current_stage_idx]["name"]
   else
-    table.insert(prnt, " [" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - ")
+    prnt[2] = prnt[2] .. "\t\t\t\t\t[" .. current_stage_idx .. "/" .. #requested_commands['stages'] .."] Current stage - "
   end
 
   -- Current job
   if current_job then
-    table.insert(prnt, " [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job - " .. current_job)
+    prnt[3] = prnt[3] .. "\t\t\t\t  [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job - " .. current_job
   else
-    table.insert(prnt, " [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job -")
+    prnt[3] = prnt[3] .. "\t\t\t\t  [" .. #requested_commands['stages'][current_stage_idx]['cmds'] - #cmd_list .. "/" .. #requested_commands['stages'][current_stage_idx]['cmds'] .."] Current job - "
   end
 
   -- Current status line
@@ -178,7 +182,7 @@ local function print_to_buffer(buffer)
   -- Job list
   for stage_idx, stage in ipairs(requested_commands['stages']) do
     table.insert(job_str_t, "")
-    table.insert(job_str_t, " --- " .. stage['name'] .." --- ")
+    table.insert(job_str_t, "===== Stage - " .. stage['name'] .. " =====")
     for idx, cmd in ipairs(requested_commands['stages'][current_stage_idx]['cmds']) do
       local job_name = cmd[1]
       if command_status['stages'][stage_idx][job_name]["status"] == "fail" then
@@ -202,9 +206,9 @@ local function print_to_buffer(buffer)
   vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 5, 0, 12)
   vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 4, 0, 12)
   vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 3, 0, 12)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 2, 7, 9)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 1, 7, 9)
-  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 0, 5, 7)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 2, 0, 12)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 1, 0, 12)
+  vim.api.nvim_buf_add_highlight(buffer, -1, "Identifier", 0, 0, 12)
 
   local gui_col = gui_purple
   local cterm_col = cterm_purple
@@ -215,6 +219,10 @@ local function print_to_buffer(buffer)
   if success == false then
     gui_col = gui_red
     cterm_col = cterm_red
+  end
+  if stopped == true then
+    gui_col = gui_gray
+    cterm_col = cterm_gray
   end
   vim.api.nvim_command('highlight Identifier guifg='.. gui_col ..' ctermfg=' .. cterm_col)
 end
@@ -308,6 +316,7 @@ local function send_job(cmd)
 end
 
 local function test()
+    stopped = false
     if term_buf == nil then
       vim.api.nvim_command('FloatermNew --name=alchemy_term')
       term_buf = vim.api.nvim_win_get_buf(0)
@@ -348,6 +357,9 @@ local function test()
 
     vim.api.nvim_buf_attach(term_buf, false, {
       on_lines=function(...)
+        if stopped == true then
+          return true
+        end
         local _, _, _, starting_line, _, ending_line, _ = ...
         local last_line_d = vim.api.nvim_buf_get_lines(term_buf, ending_line - 2, ending_line, false)
         local last_line_str = string.sub(table.concat(last_line_d), 0, 1000)
@@ -376,7 +388,7 @@ local function test()
         send_job(queued_job)
         queued_job = nil
       end
-      if complete == true then
+      if complete == true or stopped == true then
         timer:close()
         print("Complete")
       end
@@ -404,8 +416,18 @@ local function setup(user_config)
   end
 end
 
+local function send_sigint()
+  if term_buf then
+    local cmd_msg = "FloatermSend --name=alchemy_term ^C" 
+    vim.api.nvim_command(cmd_msg)
+    queued_job = nil
+    stopped = true
+  end
+end
+
 
 
 return {test = test,
         setup = setup,
-        }
+        send_sigint = send_sigint,
+}
