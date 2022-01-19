@@ -418,10 +418,11 @@ end
 
 local function send_sigint()
   if term_buf then
-    local cmd_msg = "FloatermSend --name=alchemy_term ^C" 
+    local cmd_msg = "FloatermKill --name=alchemy_term" 
     vim.api.nvim_command(cmd_msg)
     queued_job = nil
     stopped = true
+    term_buf = nil
   end
 end
 
